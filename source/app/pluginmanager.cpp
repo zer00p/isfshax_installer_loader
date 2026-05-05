@@ -403,28 +403,24 @@ static bool managePlugins(std::string pluginsPath) {
 void checkForUpdates() {
     std::string slcPosix = Paths::SlcPluginsDir;
     std::string sdPosix = Paths::SdPluginsDir;
-    std::string currentPosix = getStroopwafelPluginPath();
 
-    std::string targetPosix = "";
-    std::string minutePath = "";
+    struct Target {
+        std::string targetPosix;
+        std::string minutePath;
+    };
+    std::vector<Target> targets;
 
-    if (currentPosix == slcPosix) {
-        targetPosix = slcPosix;
-                    minutePath = Paths::SlcFwImg;    } else if (currentPosix == sdPosix || currentPosix == sdPosix + "/") {
-        targetPosix = sdPosix;
-        minutePath = convertToWiiUFsPath(Paths::SdFwImg);
-    } else {
-        uint8_t choice = showDialogPrompt(L"Which location do you want to check for updates?", L"SD", L"SLC", L"Cancel");
-        if (choice == 0) {
-            targetPosix = sdPosix;
-            minutePath = Paths::SdFwImg;
-        } else if (choice == 1) {
-            if (!checkSystemAccess()) return;
-            targetPosix = slcPosix;
-            minutePath = Paths::SlcFwImg;
-        } else {
-            return;
-        }
+    if (isSlcMounted() && dirExist(slcPosix)) {
+        targets.push_back({slcPosix, Paths::SlcFwImg});
+    }
+
+    if (WHBMountSdCard() > 0 && dirExist(sdPosix)) {
+        targets.push_back({sdPosix, Paths::SdFwImg});
+    }
+
+    if (targets.empty()) {
+        showErrorPrompt(L"No stroopwafel locations found to check for updates!");
+        return;
     }
 
     WHBLogFreetypeStartScreen();
@@ -458,94 +454,99 @@ void checkForUpdates() {
         return repoCache[repo];
     };
 
-    // Check plugins
-    DIR* dir = opendir(targetPosix.c_str());
-    if (dir) {
-        struct dirent* ent;
-        while ((ent = readdir(dir)) != nullptr) {
-            if (ent->d_type == DT_REG) {
-                std::string fileName = ent->d_name;
-                for (const auto& p : *pluginList) {
-                    if (p.fileName == fileName) {
-                        WHBLogFreetypePrintf(L"Checking %S...", toWstring(fileName).c_str());
-                        WHBLogFreetypeDrawScreen();
+    for (const auto& target : targets) {
+        std::string targetPosix = target.targetPosix;
+        std::string minutePath = target.minutePath;
 
-                        std::string repo = getRepoFromUrl(p.downloadPath);
-                        if (repo.empty()) {
-                            WHBLogFreetypePrintf(L"No repo for %S", toWstring(fileName).c_str());
+        // Check plugins
+        DIR* dir = dirOpen(targetPosix);
+        if (dir) {
+            struct dirent* ent;
+            while ((ent = readdir(dir)) != nullptr) {
+                if (ent->d_type == DT_REG) {
+                    std::string fileName = ent->d_name;
+                    for (const auto& p : *pluginList) {
+                        if (p.fileName == fileName) {
+                            WHBLogFreetypePrintf(L"Checking %S...", toWstring(fileName).c_str());
                             WHBLogFreetypeDrawScreen();
-                            continue;
-                        }
 
-                        std::string response = getCachedResponse(repo);
-                        if (response.empty()) {
-                            WHBLogFreetypePrintf(L"No API response for %S", toWstring(repo).c_str());
+                            std::string repo = getRepoFromUrl(p.downloadPath);
+                            if (repo.empty()) {
+                                WHBLogFreetypePrintf(L"No repo for %S", toWstring(fileName).c_str());
+                                WHBLogFreetypeDrawScreen();
+                                continue;
+                            }
+
+                            std::string response = getCachedResponse(repo);
+                            if (response.empty()) {
+                                WHBLogFreetypePrintf(L"No API response for %S", toWstring(repo).c_str());
+                                WHBLogFreetypeDrawScreen();
+                                continue;
+                            }
+
+                            std::string remoteHash = getDigestFromResponse(response, fileName);
+                            if (remoteHash.empty()) {
+                                WHBLogFreetypePrintf(L"No hash found for %S", toWstring(fileName).c_str());
+                                WHBLogFreetypeDrawScreen();
+                                continue;
+                            }
+
+                            std::string fullPath = targetPosix;
+                            if (fullPath.back() != '/') fullPath += "/";
+                            fullPath += fileName;
+
+                            std::string localHash = calculateSHA256(fullPath);
+                            WHBLogFreetypePrintf(L"L: %S", toWstring(localHash.substr(0, 8)).c_str());
+                            WHBLogFreetypePrintf(L"R: %S", toWstring(remoteHash.substr(0, 8)).c_str());
                             WHBLogFreetypeDrawScreen();
-                            continue;
+
+                            if (localHash != remoteHash) {
+                                outdatedFiles.push_back({fileName, repo, p.downloadPath, fullPath});
+                            }
+                            break;
                         }
-
-                        std::string remoteHash = getDigestFromResponse(response, fileName);
-                        if (remoteHash.empty()) {
-                            WHBLogFreetypePrintf(L"No hash found for %S", toWstring(fileName).c_str());
-                            WHBLogFreetypeDrawScreen();
-                            continue;
-                        }
-
-                        std::string fullPath = targetPosix;
-                        if (fullPath.back() != '/') fullPath += "/";
-                        fullPath += fileName;
-
-                        std::string localHash = calculateSHA256(fullPath);
-                        WHBLogFreetypePrintf(L"L: %S", toWstring(localHash.substr(0, 8)).c_str());
-                        WHBLogFreetypePrintf(L"R: %S", toWstring(remoteHash.substr(0, 8)).c_str());
-                        WHBLogFreetypeDrawScreen();
-
-                        if (localHash != remoteHash) {
-                            outdatedFiles.push_back({fileName, repo, p.downloadPath, fullPath});
-                        }
-                        break;
                     }
                 }
             }
+            closedir(dir);
         }
-        closedir(dir);
-    }
 
-    // Check minute
-    if (fileExist(minutePath)) {
-        WHBLogFreetypePrint(L"Checking minute (fw.img)...");
-        WHBLogFreetypeDrawScreen();
+        // Check minute
+        if (fileExist(minutePath)) {
+            WHBLogFreetypePrint(L"Checking minute (fw.img)...");
+            WHBLogFreetypeDrawScreen();
 
-        std::string repo = "StroopwafelCFW/minute_minute";
-        std::string response = getCachedResponse(repo);
-        if (!response.empty()) {
-            std::string hashFastboot = getDigestFromResponse(response, "fw_fastboot.img");
-            std::string hashFull = getDigestFromResponse(response, "fw.img");
+            std::string repo = "StroopwafelCFW/minute_minute";
+            std::string response = getCachedResponse(repo);
+            if (!response.empty()) {
+                std::string hashFastboot = getDigestFromResponse(response, "fw_fastboot.img");
+                std::string hashFull = getDigestFromResponse(response, "fw.img");
 
-            // If we found at least one hash on GitHub, perform the check.
-            // If both are empty, we assume up to date (no digest available).
-            if (!hashFastboot.empty() || !hashFull.empty()) {
-                std::string localHash = calculateSHA256(minutePath);
-                WHBLogFreetypePrintf(L"L: %S", localHash.empty() ? L"EMPTY" : toWstring(localHash.substr(0, 8)).c_str());
-                if (!hashFastboot.empty()) WHBLogFreetypePrintf(L"RF: %S", toWstring(hashFastboot.substr(0, 8)).c_str());
-                if (!hashFull.empty()) WHBLogFreetypePrintf(L"RM: %S", toWstring(hashFull.substr(0, 8)).c_str());
-                WHBLogFreetypeDrawScreen();
-
-                bool upToDate = false;
-                if ((!hashFull.empty() && localHash == hashFull) || (!hashFastboot.empty() && localHash == hashFastboot)) {
-                    upToDate = true;
-                }
-
-                if (!upToDate) {
-                    WHBLogFreetypePrint(L"Minute is outdated!");
+                // If we found at least one hash on GitHub, perform the check.
+                // If both are empty, we assume up to date (no digest available).
+                if (!hashFastboot.empty() || !hashFull.empty()) {
+                    std::string localHash = calculateSHA256(minutePath);
+                    WHBLogFreetypePrintf(L"L: %S", localHash.empty() ? L"EMPTY" : toWstring(localHash.substr(0, 8)).c_str());
+                    if (!hashFastboot.empty()) WHBLogFreetypePrintf(L"RF: %S", toWstring(hashFastboot.substr(0, 8)).c_str());
+                    if (!hashFull.empty()) WHBLogFreetypePrintf(L"RM: %S", toWstring(hashFull.substr(0, 8)).c_str());
                     WHBLogFreetypeDrawScreen();
-                    bool isSd = (minutePath.find("external01") != std::string::npos);
-                    std::string downloadUrl = isSd ? URLs::MinuteFwImg : URLs::MinuteFwFastbootImg;
-                    outdatedFiles.push_back({"fw.img", repo, downloadUrl, minutePath});
+
+                    bool upToDate = false;
+                    if ((!hashFull.empty() && localHash == hashFull) || (!hashFastboot.empty() && localHash == hashFastboot)) {
+                        upToDate = true;
+                    }
+
+                    if (!upToDate) {
+                        WHBLogFreetypePrint(L"Minute is outdated!");
+                        WHBLogFreetypeDrawScreen();
+                        bool isSd = (minutePath.find("external01") != std::string::npos);
+                        std::string downloadUrl = isSd ? URLs::MinuteFwImg : URLs::MinuteFwFastbootImg;
+                        outdatedFiles.push_back({"fw.img", repo, downloadUrl, minutePath});
+                    }
+                } else {
+                    WHBLogFreetypePrint(L"No hashes found for minute");
+                    WHBLogFreetypeDrawScreen();
                 }
-            } else {
-                WHBLogFreetypePrint(L"No hashes found for minute");
-                WHBLogFreetypeDrawScreen();
             }
         }
     }
