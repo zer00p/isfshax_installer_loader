@@ -1500,6 +1500,11 @@ void showUSBPartitionMenu() {
                     }
                 } else if (selectedOption == 3) {
                     bool targetEmulation = !hasEmulation;
+
+                    if ((targetEmulation || pluginPath == Paths::SlcPluginsDir) && !checkSystemAccess()) {
+                        break;
+                    }
+
                     if (targetEmulation && pluginPath != Paths::SlcPluginsDir) {
                         if (showDialogPrompt(L"To use SD Emulation, stroopwafel needs to be installed to the SLC", L"OK", L"Abort", nullptr, nullptr, 1, false) != 0) {
                             break;
@@ -1538,6 +1543,11 @@ void setupPartitionedUSBMenu() {
             return;
         }
         setStroopwafelPluginPath(Paths::SlcPluginsDir);
+        pluginTarget = Paths::SlcPluginsDir;
+    }
+
+    if ((sdEmulation || pluginTarget == Paths::SlcPluginsDir) && !checkSystemAccess()) {
+        return;
     }
 
     while (pluginTarget.empty() || !dirExist(pluginTarget)) {
