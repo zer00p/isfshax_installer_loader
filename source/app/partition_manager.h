@@ -44,6 +44,8 @@ struct MbrPartitionInfo {
     int partitionCount = 0;
     uint32_t lastOccupiedSector = 1;
     bool hasSpace = false;
+    uint32_t fatSizeSectors = 0;
+    uint32_t wfsSizeSectors = 0;
 };
 
 bool getMbrPartitionInfo(FSAClientHandle fsaHandle, const char* device, const FSADeviceInfo& deviceInfo, uint8_t* mbr, MbrPartitionInfo& info);

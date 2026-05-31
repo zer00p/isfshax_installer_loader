@@ -688,10 +688,16 @@ bool getMbrPartitionInfo(FSAClientHandle fsaHandle, const char* device, const FS
             uint8_t type = mbr[446 + i * 16 + 4];
             if (type != 0) {
                 info.partitionCount++;
-                if (i == 0 && (type == 0x01 || type == 0x04 || type == 0x06 || type == 0x0B || type == 0x0C || type == 0x0E)) info.hasFat = true;
-                if (type == 0x07 || type == 0x17) info.hasWfs = true;
                 uint32_t start = read32LE(&mbr[446 + i * 16 + 8]);
                 uint32_t sectors = read32LE(&mbr[446 + i * 16 + 12]);
+                if (i == 0 && (type == 0x01 || type == 0x04 || type == 0x06 || type == 0x0B || type == 0x0C || type == 0x0E)) {
+                    info.hasFat = true;
+                    info.fatSizeSectors = sectors;
+                }
+                if (type == 0x07 || type == 0x17) {
+                    info.hasWfs = true;
+                    info.wfsSizeSectors += sectors;
+                }
                 if (start + sectors > info.lastOccupiedSector) {
                     info.lastOccupiedSector = start + sectors;
                 }
@@ -763,6 +769,24 @@ bool handlePartitionActionMenu(FSAClientHandle fsaHandle, const FSADeviceInfo& d
             break;
         }
 
+        double fatGB = 0.0;
+        double wfsGB = 0.0;
+        double freeGB = 0.0;
+        
+        if (info.partitionCount == 0) {
+            fatGB = (double)deviceInfo.deviceSizeInSectors * deviceInfo.deviceSectorSize / (1024.0 * 1024.0 * 1024.0);
+        } else {
+            fatGB = (double)info.fatSizeSectors * deviceInfo.deviceSectorSize / (1024.0 * 1024.0 * 1024.0);
+            wfsGB = (double)info.wfsSizeSectors * deviceInfo.deviceSectorSize / (1024.0 * 1024.0 * 1024.0);
+        }
+
+        uint32_t alignSectors = (64 * 1024 * 1024) / deviceInfo.deviceSectorSize;
+        uint32_t p_start = ((info.lastOccupiedSector + alignSectors - 1) / alignSectors) * alignSectors;
+        if (p_start < deviceInfo.deviceSizeInSectors) {
+            uint32_t p_size = deviceInfo.deviceSizeInSectors - p_start;
+            freeGB = (double)p_size * deviceInfo.deviceSectorSize / (1024.0 * 1024.0 * 1024.0);
+        }
+
         std::vector<std::wstring> buttons;
         int optKeep = -1, optCreate = -1, optRepartition = -1, optCancel = -1;
 
@@ -772,7 +796,9 @@ bool handlePartitionActionMenu(FSAClientHandle fsaHandle, const FSADeviceInfo& d
         }
         if (info.hasSpace && !info.hasWfs) {
             optCreate = (int)buttons.size();
-            buttons.push_back(L"Create additional Wii U partition");
+            wchar_t buf[64];
+            swprintf(buf, std::size(buf), L"Create additional Wii U partition (%.1f GB)", freeGB);
+            buttons.push_back(buf);
         }
         optRepartition = (int)buttons.size();
         buttons.push_back(L"Repartition");
@@ -780,7 +806,28 @@ bool handlePartitionActionMenu(FSAClientHandle fsaHandle, const FSADeviceInfo& d
         buttons.push_back(L"Cancel");
 
         showDeviceInfoScreen(fsaHandle, "/dev/sdcard01", deviceInfo);
-        std::wstring prompt = L"How do you want to partition the " + std::wstring(deviceTypeName) + L"?";
+        
+        wchar_t fatStr[32] = L"None";
+        if (fatGB > 0) swprintf(fatStr, std::size(fatStr), L"%.1f GB", fatGB);
+
+        wchar_t wfsStr[32] = L"None";
+        if (wfsGB > 0) swprintf(wfsStr, std::size(wfsStr), L"%.1f GB", wfsGB);
+
+        wchar_t promptBuf[512];
+        swprintf(promptBuf, std::size(promptBuf), 
+            L"How do you want to partition the %s?\n\n"
+            L"Homebrew (FAT32): %s\n"
+            L"Wii U games: %s\n\n", 
+            deviceTypeName, fatStr, wfsStr);
+
+        std::wstring prompt = promptBuf;
+
+        if (info.hasSpace && !info.hasWfs) {
+            prompt += L"You can add a Wii U Game partition in the unallocated space.";
+        } else if (!info.hasWfs) {
+            prompt += L"You need to repartition to install Wii U games.";
+        }
+
         uint8_t choice = showDialogPrompt(prompt.c_str(), buttons, 0, false);
 
         if (choice == optKeep) {

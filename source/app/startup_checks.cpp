@@ -72,7 +72,7 @@ static void setupUsbStorage(FSAClientHandle fsaHandle, bool& wantsPartitionedSto
             } else {
                 // Cannot be mounted
                 showDeviceInfoScreen(fsaHandle, "/dev/sdcard01", devInfo);
-                uint8_t usbChoice = showDialogPrompt(L"The USB device isn't formatted for the Wii U.\nDo you want to format it for homebrew or also store Wii U games on it?", L"Homebrew only", L"Homebrew + Games", L"Cancel", nullptr, 0, false);
+                uint8_t usbChoice = showDialogPrompt(L"The USB device isn't formatted for Homebrew.\nDo you want to format it for homebrew or also store Wii U games on it?", L"Homebrew only", L"Homebrew + Games", L"Cancel", nullptr, 0, false);
                 if (usbChoice == 1) {
                     wantsPartitionedStorage = true;
                     guard.block();
@@ -230,7 +230,7 @@ bool performStartupChecks() {
                 break;
             } else {
                 // SD doesn't exist, try USB
-                std::vector<std::wstring> options = { L"Retry SD", L"Use USB", L"Abort" };
+                std::vector<std::wstring> options = { L"Retry SD", L"Use USB (do NOT connect it just yet)", L"Abort" };
                 uint8_t choice = showDialogPrompt(L"No SD card detected.", options, 0);
 
                 if (choice == 0) {
