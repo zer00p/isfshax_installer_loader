@@ -815,9 +815,9 @@ bool handlePartitionActionMenu(FSAClientHandle fsaHandle, const FSADeviceInfo& d
 
         wchar_t promptBuf[512];
         swprintf(promptBuf, std::size(promptBuf), 
-            L"How do you want to partition the %s?\n\n"
-            L"Homebrew (FAT32): %s\n"
-            L"Wii U games: %s\n\n", 
+            L"How do you want to partition the %ls?\n\n"
+            L"Homebrew (FAT32): %ls\n"
+            L"Wii U games: %ls\n\n", 
             deviceTypeName, fatStr, wfsStr);
 
         std::wstring prompt = promptBuf;
