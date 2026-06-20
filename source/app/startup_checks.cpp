@@ -145,8 +145,10 @@ bool performIsfshaxCheck(bool usingUSB, bool wantsPartitionedStorage) {
     if (choice == 0) {
         installIsfshax(false, false);
     } else if (choice == 1 || choice == 255) {
-        if (usingUSB || wantsPartitionedStorage) {
-            showDialogPrompt(L"You chose not to setup ISFShax.\nNote that USB-as-SD and partitioned storage REQUIRE Stroopwafel and ISFShax to work!", L"OK");
+        if (usingUSB) {
+            showDialogPrompt(L"You chose not to setup ISFShax.\nNote that USB-as-SD storage REQUIRES Stroopwafel and ISFShax to work!", L"OK");
+        } else if (wantsPartitionedStorage) {
+            showDialogPrompt(L"You chose not to setup ISFShax.\nNote that partitioned storage REQUIRES Stroopwafel and ISFShax to work!", L"OK");
         }
     }
     return false;
