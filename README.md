@@ -4,6 +4,9 @@
     <p>Wafel Installer is a tool for the Wii U designed to be launched via the browser (at <a href="https://wafel.xyz">wafel.xyz</a>) or directly from Aroma. It assists in preparing storage devices by formatting and partitioning SD cards or USB drives to support both homebrew and game storage. The application automates the setup of Aroma, Stroopwafel CFW, and the ISFShax exploit.</p>
 </div>
 
+To mod your Wii U follow the [Guide](Guide/START_HERE.md).
+
+
 ## Features
 - **CFW Setup**: Installs Stroopwafel CFW, ISFShax, and the Aroma environment.
 - **Storage Preparation**: Formats and partitions SD cards and USB drives, supporting FAT32 on devices larger than 32GB.
@@ -18,10 +21,14 @@
 Use [wafel.xyz](https://wafel.xyz) on your Wii U to launch Wafel Installer without any setup or SD card.
 
 **Method 2:**
-Use the Wii U App Store to download it. See Dumpling's page [here](https://apps.fortheusers.org/wiiu/wafel_installer). (coming soon)
+Use the Wii U App Store to download it. (coming soon)
 
 **Method 3:**  
 Download the [latest release from GitHub](https://github.com/zer00p/wafel_installer/releases), and extract the `wafel_installer.zip` file to the root of your SD card.
+
+## Guide
+
+To mod your Wii U follow the [Guide](Guide/START_HERE.md).
 
 ## How to compile
  - Install [DevkitPro](https://devkitpro.org/wiki/Getting_Started) for your platform.
