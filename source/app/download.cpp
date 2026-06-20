@@ -140,20 +140,19 @@ bool downloadFile(const std::string& url, const std::string& path) {
         curl_easy_cleanup(curl_handle);
 
         if (res != CURLE_OK) {
-            WHBLogFreetypePrintf(L"Curl failed: %S", toWstring(curl_easy_strerror(res)).c_str());
-            WHBLogFreetypeDrawScreen();
-            std::wstring error = L"Curl failed: " + toWstring(curl_easy_strerror(res));
+            removeFile(tempPath); // Clean up temp file
+            std::wstring error;
             if (res == CURLE_PEER_FAILED_VERIFICATION || res == CURLE_SSL_CONNECT_ERROR) {
-                error += L"\nPlease check if your system date and time are correct!";
+                error = L"Download failed!\nPlease check if your system date and time are correct.";
             } else if (res == CURLE_FILESIZE_EXCEEDED) {
                 error = L"Download aborted: File size exceeded 10MB limit for SLC!";
+            } else {
+                error = L"Download failed!\nPlease check your internet connection.\n(" + toWstring(curl_easy_strerror(res)) + L")";
             }
             setErrorPrompt(error);
             if (showErrorPrompt(L"Cancel", true)) {
-                removeFile(tempPath); // Clean up temp file
                 continue;
             }
-            removeFile(tempPath); // Clean up temp file on other errors
             return false;
         }
 
@@ -211,13 +210,16 @@ bool downloadToBuffer(const std::string& url, std::string& buffer) {
         curl_easy_cleanup(curl_handle);
 
         if (res != CURLE_OK) {
-            std::wstring error = L"Curl failed for " + toWstring(url) + L":\n" + toWstring(curl_easy_strerror(res));
+            buffer.clear();
+            WHBLogFreetypePrintf(L"Curl failed for %S: %S", toWstring(url).c_str(), toWstring(curl_easy_strerror(res)).c_str());
+            std::wstring error;
             if (res == CURLE_PEER_FAILED_VERIFICATION || res == CURLE_SSL_CONNECT_ERROR) {
-                error += L"\nPlease check if your system date and time are correct!";
+                error = L"Download failed!\nPlease check if your system date and time are correct.";
+            } else {
+                error = L"Download failed!\nPlease check your internet connection.\n(" + toWstring(curl_easy_strerror(res)) + L")";
             }
             setErrorPrompt(error);
             if (showErrorPrompt(L"Cancel", true)) {
-                buffer.clear();
                 continue;
             }
             return false;
