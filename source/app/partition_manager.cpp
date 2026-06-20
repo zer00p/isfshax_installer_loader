@@ -29,7 +29,7 @@
 
 using namespace std::chrono_literals;
 
-const wchar_t* WFS_FORMAT_REMINDER = L"Important: After the reboot, you will need to format the partition.\n"
+const wchar_t* WFS_FORMAT_REMINDER = L"Important: After the reboot, you will need to format the (emulated) USB storage.\n"
                                      L"If the system prompt doesn't appear, please format it manually\n"
                                      L"in System Settings -> Data Management.";
 
