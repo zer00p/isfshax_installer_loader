@@ -121,7 +121,7 @@ static int testReadMlcRaw() {
     IOSHandle handle = -1;
     int errorCount = -1;
     uint8_t* buffer = nullptr;
-    uint32_t buffer_size_lba = 256; // 128KB chunks if sector is 512B
+    uint32_t buffer_size_lba = 128;
     size_t buffer_size = 0;
     uint64_t totalBlocks = 0;
     uint64_t blocksRead = 0;
