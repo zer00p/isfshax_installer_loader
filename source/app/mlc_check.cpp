@@ -10,6 +10,7 @@
 #include <fstream>
 #include <string>
 #include <malloc.h>
+#include "filesystem.h"
 
 /*
  * This file contains code and logic inspired by the following open source projects:
@@ -73,19 +74,15 @@ static void checkMlcManufacturer(bool& isHynix, std::wstring& manufacturerName) 
     }
 }
 
-static void checkMlcLogs(int& corruptionErrors, int& mediaErrors) {
+static bool checkMlcLogs(int& corruptionErrors, int& mediaErrors) {
     corruptionErrors = 0;
     mediaErrors = 0;
 
-    std::string sourceDirectory = Paths::SlcRoot + "/sys/logs";
-    DIR *dir = opendir(sourceDirectory.c_str());
-    if (!dir) {
-        sourceDirectory = "/vol/system/sys/logs";
-        dir = opendir(sourceDirectory.c_str());
-    }
+    std::string sourceDirectory = "/vol/system/logs";
+    DIR *dir = dirOpen(sourceDirectory);
     
     if (!dir) {
-        return;
+        return false;
     }
 
     struct dirent *dp;
@@ -93,7 +90,7 @@ static void checkMlcLogs(int& corruptionErrors, int& mediaErrors) {
         std::string filename(dp->d_name);
         if (filename.length() >= 4 && filename.substr(filename.length() - 4) == ".log") {
             std::string sourceFullPath = sourceDirectory + "/" + filename;
-            std::ifstream file(sourceFullPath);
+            std::ifstream file(convertToWiiUFsPath(sourceFullPath));
             std::string line;
             while (std::getline(file, line)) {
                 if (line.find("DATA CORRUPTION ERROR") != std::string::npos) {
@@ -112,6 +109,7 @@ static void checkMlcLogs(int& corruptionErrors, int& mediaErrors) {
         }
     }
     closedir(dir);
+    return true;
 }
 
 static int testReadMlcRaw() {
@@ -229,11 +227,16 @@ void showCheckMlcMenu() {
 
     int corruptionErrors = 0;
     int mediaErrors = 0;
-    checkMlcLogs(corruptionErrors, mediaErrors);
+    bool logsSuccess = checkMlcLogs(corruptionErrors, mediaErrors);
 
     std::wstring report = L"Manufacturer: " + manufacturerName + (isHynix ? L" (WARNING)" : L" (Good)");
-    report += L"\nLogs - Data Corruption Errors: " + std::to_wstring(corruptionErrors);
-    report += L"\nLogs - Media Errors: " + std::to_wstring(mediaErrors) + L"\n\n";
+    
+    if (logsSuccess) {
+        report += L"\nLogs - Data Corruption Errors: " + std::to_wstring(corruptionErrors);
+        report += L"\nLogs - Media Errors: " + std::to_wstring(mediaErrors) + L"\n\n";
+    } else {
+        report += L"\nLogs: FAILED TO OPEN LOGS DIRECTORY!\n\n";
+    }
 
     bool suggestIsfshax = false;
     bool suggestLongRead = false;
