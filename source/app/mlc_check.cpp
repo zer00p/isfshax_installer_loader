@@ -119,7 +119,7 @@ static int testReadMlcRaw() {
     IOSHandle handle = -1;
     int errorCount = -1;
     uint8_t* buffer = nullptr;
-    uint32_t buffer_size_lba = 128;
+    uint32_t buffer_size_lba = 2048; // 1MB
     size_t buffer_size = 0;
     uint64_t totalBlocks = 0;
     uint64_t blocksRead = 0;
@@ -190,13 +190,13 @@ static int testReadMlcRaw() {
             WHBLogFreetypePrint(L" ");
             WHBLogFreetypePrint(L"Press B to abort test");
             WHBLogFreetypeDrawScreen();
+        }
 
-            updateInputs();
-            if (pressedBack()) {
-                if(!errorCount)
-                    errorCount = -2; // Aborted
-                goto cleanup;
-            }
+        updateInputs();
+        if (pressedBack()) {
+            if(!errorCount)
+                errorCount = -2; // Aborted
+            goto cleanup;
         }
     }
 
@@ -268,30 +268,28 @@ void showCheckMlcMenu() {
 
     showDialogPrompt(report.c_str(), L"OK");
 
-    if (mediaErrors == 0) {
-        std::wstring readPrompt = L"Do you want to run the extended raw read test?\n(Takes several hours). ";
-        if (!suggestLongRead) {
-            readPrompt += L"It is likely not necessary.";
-        } else {
-            readPrompt += L"It is suggested.";
-        }
-        
-        uint8_t choice = showDialogPrompt(readPrompt.c_str(), L"Yes", L"No", nullptr, nullptr, suggestLongRead ? 0 : 1);
-        if (choice == 0) {
-            int errors = testReadMlcRaw();
-            if (errors == -2) {
-                showDialogPrompt(L"Extended read test aborted.", L"OK");
-            } else if (errors > 0) {
-                std::wstring msg = L"Finished reading MLC.\nFound " + std::to_wstring(errors) + L" read errors.\nThis indicates a failing eMMC.";
-                if (!isIsfshaxInstalled()) {
-                    msg += L"\n\nCRITICAL: You should install ISFShax immediately!";
-                }
-                showDialogPrompt(msg.c_str(), L"OK");
-            } else if (errors == 0) {
-                showSuccessPrompt(L"Finished reading MLC!\nNo media errors found.");
-            } else {
-                showErrorPrompt(L"Failed to execute raw read test.", false);
+    std::wstring readPrompt = L"Do you want to run the extended raw read test?\n(Takes several hours). ";
+    if (!suggestLongRead) {
+        readPrompt += L"It is likely not necessary.";
+    } else {
+        readPrompt += L"It is suggested.";
+    }
+    
+    uint8_t choice = showDialogPrompt(readPrompt.c_str(), L"Yes", L"No", nullptr, nullptr, suggestLongRead ? 0 : 1);
+    if (choice == 0) {
+        int errors = testReadMlcRaw();
+        if (errors == -2) {
+            showDialogPrompt(L"Extended read test aborted.", L"OK");
+        } else if (errors > 0) {
+            std::wstring msg = L"Finished reading MLC.\nFound " + std::to_wstring(errors) + L" read errors.\nThis indicates a failing eMMC.";
+            if (!isIsfshaxInstalled()) {
+                msg += L"\n\nCRITICAL: You should install ISFShax immediately!";
             }
+            showDialogPrompt(msg.c_str(), L"OK");
+        } else if (errors == 0) {
+            showSuccessPrompt(L"Finished reading MLC!\nNo media errors found.");
+        } else {
+            showErrorPrompt(L"Failed to execute raw read test.", false);
         }
     }
 }
