@@ -13,6 +13,7 @@
 #include <malloc.h>
 #include <cerrno>
 #include "filesystem.h"
+#include "isfshax_menu.h"
 
 /*
  * This file contains code and logic inspired by the following open source projects:
@@ -440,12 +441,6 @@ void showCheckNandMenu() {
         if (logErrors.scfmCorruption || mlcConfirmedBad) {
             logReport += L"\nCRITICAL: You should install ISFShax IMMEDIATELY\n";
             logReport += L"as a safety net against an impending brick!\n";
-        } else if (logErrors.slcCorruptionErrors > 0 || logErrors.mlcCorruptionErrors > 0) {
-            logReport += L"\nWarning: Corruption errors detected. It is highly\n";
-            logReport += L"recommended to install ISFShax as a precaution.\n";
-        } else if (isHynix) {
-            logReport += L"\nNote: You have a Hynix eMMC. You can install ISFShax\n";
-            logReport += L"now to allow easy recovery of potential problems in the future.\n";
         }
     }
 
@@ -515,15 +510,30 @@ void showCheckNandMenu() {
             showDialogPrompt(L"Extended read test aborted.", L"OK");
         } else if (rawErrors > 0) {
             std::wstring msg = L"Finished reading MLC.\nFound " + std::to_wstring(rawErrors) + L" read errors.\nThis indicates a failing eMMC.";
-            if (!isIsfshaxInstalled()) {
-                msg += L"\n\nCRITICAL: You should install ISFShax immediately!";
-            }
             showDialogPrompt(msg.c_str(), L"OK");
             mlcConfirmedBad = true; // Mark as bad from raw scan
         } else if (rawErrors == 0) {
             showSuccessPrompt(L"Finished reading MLC!\nNo media errors found.");
         } else {
             showErrorPrompt(L"Failed to execute raw read test.", false);
+        }
+    }
+
+    // --- Offer ISFShax Installation ---
+    if (!isIsfshaxInstalled()) {
+        std::wstring isfshaxMsg = L"";
+        if (logErrors.scfmCorruption || mlcConfirmedBad) {
+            isfshaxMsg = L"CRITICAL: You should install ISFShax IMMEDIATELY\nas a safety net against an impending brick!\n\nWould you like to install ISFShax now?";
+        } else if (logErrors.slcCorruptionErrors > 0 || logErrors.mlcCorruptionErrors > 0) {
+            isfshaxMsg = L"Warning: Corruption errors detected. It is highly\nrecommended to install ISFShax as a precaution.\n\nWould you like to install ISFShax now?";
+        } else if (isHynix) {
+            isfshaxMsg = L"Note: You have a Hynix eMMC. You can install ISFShax\nnow to allow easy recovery of potential problems in the future.\n\nWould you like to install ISFShax now?";
+        }
+
+        if (!isfshaxMsg.empty()) {
+            if (showDialogPrompt(isfshaxMsg.c_str(), L"Yes, install ISFShax", L"No, skip", nullptr, nullptr, 0) == 0) {
+                installIsfshax(false, false);
+            }
         }
     }
 
