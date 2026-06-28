@@ -27,30 +27,16 @@ jobs:
           cache-to: type=gha,mode=max
       - name: build binary
         run: |
-          docker run --rm -v ${PWD}:/project builder:latest /bin/bash -c "make clean && make"
+          docker run --rm -v ${PWD}:/project builder:latest /bin/bash -c "make clean && make && make isfshax_installer_loader.wuhb"
       - name: create distribution .zip
         run: |
-          docker run --rm -v ${PWD}:/project builder make dist
+          docker run --rm -v ${PWD}:/project builder:latest make dist
       - uses: actions/upload-artifact@v4
         with:
-          name: wafel_installer
-          path: "./dist/wiiu/apps/wafel_installer"
-  build-guide:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install pandoc
-        run: sudo apt-get update && sudo apt-get install -y pandoc
-      - name: Build guide HTML
-        run: python3 build_guide.py
-      - name: Create guide.zip
-        run: cd Guide_html && zip -r ../guide.zip .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: guide
-          path: guide.zip
+          name: isfshax_installer_loader
+          path: "./dist/wiiu/apps/isfshax_installer_loader"
   deploy-binary:
-    needs: [build-binary, build-guide]
+    needs: [build-binary]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
@@ -61,12 +47,8 @@ jobs:
           echo "DATETIME=$(date '+%Y%m%d-%H%M%S')" >> $GITHUB_ENV
       - uses: actions/download-artifact@v4
         with:
-          name: wafel_installer
-          path: wafel_installer
-      - uses: actions/download-artifact@v4
-        with:
-          name: guide
-          path: guide
+          name: isfshax_installer_loader
+          path: isfshax_installer_loader
       - name: Create Release
         uses: "softprops/action-gh-release@v2"
         with:
@@ -76,6 +58,5 @@ jobs:
           generate_release_notes: true
           name: Nightly-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
           files: |
-            wafel_installer/wafel_installer.wuhb
-            wafel_installer/wafel_installer.rpx
-            guide/guide.zip
+            isfshax_installer_loader/isfshax_installer_loader.wuhb
+            isfshax_installer_loader/isfshax_installer_loader.rpx
