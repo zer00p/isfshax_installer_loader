@@ -12,10 +12,32 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <mocha/mocha.h>
+#include <stroopwafel/stroopwafel.h>
 
 using namespace std::chrono_literals;
 
 #define OPTION(n) (selectedOption == (n) ? L'>' : L' ')
+
+bool isIsfshaxInstalled() {
+    uint32_t val = 0;
+    if (Mocha_IOSUKernelRead32(0x1072272C, &val) != MOCHA_RESULT_SUCCESS) {
+        return false;
+    }
+    return val != 0xe3e05000;
+}
+
+bool isStroopwafelAvailable() {
+    static bool checked = false;
+    static bool available = false;
+    if (!checked) {
+        if (Stroopwafel_InitLibrary() == STROOPWAFEL_RESULT_SUCCESS) {
+            available = true;
+        }
+        checked = true;
+    }
+    return available;
+}
 
 bool confirmIsfshaxAction(const wchar_t* action, bool isUninstall = false) {
     std::wstring message = L"";
@@ -156,17 +178,42 @@ void installIsfshax(bool uninstall, bool manual) {
 void showMainMenu() {
     uint8_t selectedOption = 0;
     while(true) {
+        bool isfshaxInstalled = isIsfshaxInstalled();
+        uint8_t numOptions = isfshaxInstalled ? 3 : 2;
+        
+        if (selectedOption >= numOptions) {
+            selectedOption = numOptions - 1;
+        }
+
         bool startSelectedOption = false;
         while(!startSelectedOption) {
             // Print menu text
             WHBLogFreetypeStartScreen();
             WHBLogFreetypePrint(L"ISFShax Installer Launcher");
             WHBLogFreetypePrint(L"===============================");
-            WHBLogFreetypePrintf(L"%C Install ISFShax", OPTION(0));
-            WHBLogFreetypePrintf(L"%C Uninstall ISFShax", OPTION(1));
-            WHBLogFreetypePrintf(L"%C Boot ISFShax Installer (Manual)", OPTION(2));
+            
+            WHBLogFreetypePrintf(L"%C %S", OPTION(0), isfshaxInstalled ? L"Reinstall / Update ISFShax" : L"Install ISFShax");
+            
+            if (isfshaxInstalled) {
+                WHBLogFreetypePrintf(L"%C Uninstall ISFShax", OPTION(1));
+                WHBLogFreetypePrintf(L"%C Boot ISFShax Installer (Manual)", OPTION(2));
+            } else {
+                WHBLogFreetypePrintf(L"%C Boot ISFShax Installer (Manual)", OPTION(1));
+            }
+
             WHBLogFreetypePrint(L" ");
             WHBLogFreetypeScreenPrintBottom(L"===============================");
+            
+            std::wstring statusMsg = L"Status: ISFShax ";
+            statusMsg += (isfshaxInstalled ? L"Installed" : L"Not Installed");
+            
+            if (isStroopwafelAvailable()) {
+                statusMsg += L" | Stroopwafel Detected";
+            }
+            
+            WHBLogFreetypeScreenPrintBottom(statusMsg.c_str());
+            WHBLogFreetypeScreenPrintBottom(L"");
+            
             WHBLogFreetypeScreenPrintBottom(L"\uE000 Button = Select Option \uE001 Button = Exit");
             WHBLogFreetypeScreenPrintBottom(L"");
             WHBLogFreetypeDrawScreen();
@@ -183,7 +230,7 @@ void showMainMenu() {
                     }
                 }
                 if (navigatedDown()) {
-                    if (selectedOption < 2) {
+                    if (selectedOption < numOptions - 1) {
                         selectedOption++;
                         break;
                     }
@@ -200,18 +247,31 @@ void showMainMenu() {
         }
 
         // Go to the selected menu
-        switch(selectedOption) {
-            case 0:
-                installIsfshax(false, false);
-                break;
-            case 1:
-                installIsfshax(true, false);
-                break;
-            case 2:
-                installIsfshax(false, true);
-                break;
-            default:
-                break;
+        if (isfshaxInstalled) {
+            switch(selectedOption) {
+                case 0:
+                    installIsfshax(false, false);
+                    break;
+                case 1:
+                    installIsfshax(true, false);
+                    break;
+                case 2:
+                    installIsfshax(false, true);
+                    break;
+                default:
+                    break;
+            }
+        } else {
+            switch(selectedOption) {
+                case 0:
+                    installIsfshax(false, false);
+                    break;
+                case 1:
+                    installIsfshax(false, true);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }
