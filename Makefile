@@ -31,7 +31,6 @@ include $(DEVKITPRO)/wut/share/wut_rules
 # TARGET is the name of the output
 # BUILD is the directory where object files & intermediate files will be placed
 # SOURCES is a list of directories containing source code
-# DATA is a list of directories containing data files
 # INCLUDES is a list of directories containing header files
 # CONTENT is the path to the bundled folder that will be mounted as /vol/content/
 # ICON is the game icon, leave blank to use default rule
@@ -44,7 +43,6 @@ SOURCES		:=	source/app \
 				source/app/interfaces \
 				source/utils \
 				source/utils/libschrift
-DATA		:=	data
 INCLUDES	:=	include
 CONTENT		:=
 ICON		:=	dist/isfshax_installer_loader-icon.png
@@ -76,7 +74,7 @@ CXXFLAGS	:=	$(CFLAGS) -std=c++20
 ASFLAGS		:=	-g $(ARCH)
 LDFLAGS		=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map)
 
-LIBS		:=	-lstdc++ -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz -lmocha -lwut -lstroopwafel
+LIBS		:=	-lstdc++ -lz -lmbedcrypto -lmocha -lwut -lstroopwafel
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level
@@ -95,15 +93,14 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 export TOPDIR	:=	$(CURDIR)
 
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES			:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES			:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES		:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+BINFILES		:=
 
 #-------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -197,7 +194,7 @@ dist:
 	@mkdir -p dist/wiiu/apps/isfshax_installer_loader
 	@echo Put latest files into it
 	@cp dist/meta.xml dist/wiiu/apps/isfshax_installer_loader/meta.xml
-	@cp dist/wafel_installer-banner.png dist/wiiu/apps/isfshax_installer_loader/icon.png
+	@cp dist/isfshax_installer_loader-banner.png dist/wiiu/apps/isfshax_installer_loader/icon.png
 	@cp $(TARGET).rpx dist/wiiu/apps/isfshax_installer_loader/$(TARGET).rpx
 	@cp $(TARGET).wuhb dist/wiiu/apps/isfshax_installer_loader/$(TARGET).wuhb
 	@echo Zip up a release zip
@@ -216,8 +213,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #-------------------------------------------------------------------------------
 all: $(OUTPUT).wuhb $(OUTPUT).wua
 
-$(OUTPUT).wuhb	:	$(OUTPUT).rpx
-	
+
 $(OUTPUT).wua	:	$(OUTPUT).rpx
 	@echo Creating wua...
 	@cp $(OUTPUT).rpx $(TOPDIR)/dist/wua/00050000103b3b3b_v0/code/isfshax_installer_loader.rpx
