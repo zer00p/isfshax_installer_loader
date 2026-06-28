@@ -14,9 +14,7 @@ void showLoadingScreen() {
     WHBLogFreetypeSetBackgroundColor(0xd4860000);
     WHBLogFreetypeSetFontColor(0xFFFFFFFF);
     WHBLogFreetypeSetFontSize(22);
-    WHBLogPrint("Wafel Installer");
-    WHBLogPrint("-- Based on dumpling made by Crementif, Emiyl --");
-    WHBLogPrint("");
+    WHBLogPrint("Initializing...");
     WHBLogFreetypeDraw();
 }
 
