@@ -28,7 +28,7 @@ uint8_t* currTVFrameBuffer = nullptr;
 uint8_t* currDRCFrameBuffer = nullptr;
 
 uint32_t fontColor = 0xFFFFFFFF;
-uint32_t backgroundColor = 0x0B5D5E00;
+uint32_t backgroundColor = 0x66006600;
 SFT fontFace = {};
 int32_t cursorSpaceWidth = 0;
 uint8_t* fontBuffer;

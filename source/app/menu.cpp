@@ -11,7 +11,7 @@
 #define CHECK_SHUTDOWN_VAL(val) if (!stillRunning()) return val;
 
 void showLoadingScreen() {
-    WHBLogFreetypeSetBackgroundColor(0xd4860000);
+    WHBLogFreetypeSetBackgroundColor(0x66006600);
     WHBLogFreetypeSetFontColor(0xFFFFFFFF);
     WHBLogFreetypeSetFontSize(22);
     WHBLogPrint("Initializing...");
