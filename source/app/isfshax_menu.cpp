@@ -129,7 +129,7 @@ void installIsfshax(bool uninstall, bool manual) {
             uint8_t choice = showDialogPrompt(L"The ISFShax installer is controlled with the buttons on the main console.\nPOWER: moves the curser\nEJECT: confirm\nPress A to launch into the ISFShax Installer", L"Continue", L"Cancel");
             if (choice == 0) {
                 if (verifySuperblock()) {
-                    loadFwImg(Paths::SdInstallerImg, 0, 0);
+                    loadFwImg(Paths::SdInstallerImgIos, 0, 0);
                     break;
                 }
             } else {
@@ -141,14 +141,14 @@ void installIsfshax(bool uninstall, bool manual) {
 
     if(uninstall){
         if (confirmIsfshaxAction(L"Uninstall", true)) {
-            loadFwImg(Paths::SdInstallerImg, ISFSHAX_CMD_UNINSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
+            loadFwImg(Paths::SdInstallerImgIos, ISFSHAX_CMD_UNINSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
         }
         return;
     }
 
     if (confirmIsfshaxAction(L"Install")) {
         if (verifySuperblock()) {
-            loadFwImg(Paths::SdInstallerImg, ISFSHAX_CMD_INSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
+            loadFwImg(Paths::SdInstallerImgIos, ISFSHAX_CMD_INSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
         }
     }
 }
