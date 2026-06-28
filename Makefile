@@ -21,8 +21,8 @@ TOPDIR ?= $(CURDIR)
 # APP_SHORTNAME sets the short name of the application
 # APP_AUTHOR sets the author of the application
 #-------------------------------------------------------------------------------
-APP_NAME		:=	Wafel Installer
-APP_SHORTNAME	:=	Wafel
+APP_NAME		:=	ISFShax Installer Launcher
+APP_SHORTNAME	:=	ISFShax Loader
 APP_AUTHOR		:=	Crementif, emiyl and zer00p
 
 include $(DEVKITPRO)/wut/share/wut_rules
@@ -38,7 +38,7 @@ include $(DEVKITPRO)/wut/share/wut_rules
 # TV_SPLASH is the image displayed during bootup on the TV, leave blank to use default rule
 # DRC_SPLASH is the image displayed during bootup on the DRC, leave blank to use default rule
 #-------------------------------------------------------------------------------
-TARGET		:=	wafel_installer
+TARGET		:=	isfshax_installer_loader
 BUILD		:=	build
 SOURCES		:=	source/app \
 				source/app/interfaces \
@@ -47,9 +47,9 @@ SOURCES		:=	source/app \
 DATA		:=	data
 INCLUDES	:=	include
 CONTENT		:=
-ICON		:=	dist/wafel_installer-icon.png
-TV_SPLASH	:=	dist/wafel_installer-tv-boot.png
-DRC_SPLASH	:=	dist/wafel_installer-drc-boot.png
+ICON		:=	dist/isfshax_installer_loader-icon.png
+TV_SPLASH	:=	dist/isfshax_installer_loader-tv-boot.png
+DRC_SPLASH	:=	dist/isfshax_installer_loader-drc-boot.png
 
 #-------------------------------------------------------------------------------
 # options for code generation
@@ -165,10 +165,6 @@ all: $(BUILD)
 
 $(BUILD):
 	@$(shell [ -d $@ ] || mkdir -p $@)
-	@$(MAKE) CC=$(DEVKITARM)/bin/arm-none-eabi-gcc CXX=$(DEVKITARM)/devkitARM/bin/arm-none-eabi-g++ -C $(CURDIR)/source/cfw/ios_usb
-	@$(MAKE) CC=$(DEVKITARM)/bin/arm-none-eabi-gcc CXX=$(DEVKITARM)/devkitARM/bin/arm-none-eabi-g++ -C $(CURDIR)/source/cfw/ios_mcp
-	@$(MAKE) CC=$(DEVKITARM)/bin/arm-none-eabi-gcc CXX=$(DEVKITARM)/devkitARM/bin/arm-none-eabi-g++ -C $(CURDIR)/source/cfw/ios_fs
-	@$(MAKE) CC=$(DEVKITARM)/bin/arm-none-eabi-gcc CXX=$(DEVKITARM)/devkitARM/bin/arm-none-eabi-g++ -C $(CURDIR)/source/cfw/ios_kernel
 	@$(MAKE) CC=$(DEVKITPPC)/bin/powerpc-eabi-gcc CXX=$(DEVKITPPC)/bin/powerpc-eabi-g++ -C $(BUILD) -f $(CURDIR)/Makefile
 
 #-------------------------------------------------------------------------------
@@ -193,24 +189,20 @@ clean:
 	@echo Clean files from app...
 	@rm -fr $(BUILD) $(TARGET).wuhb $(TARGET).rpx $(TARGET).wua $(TARGET).elf
 	@rm -fr dist/wua/00050000103b3b3b_v0/code/$(TARGET).rpx
-	@rm -fr dist/wiiu/apps/wafel_installer/$(TARGET).rpx dist/wiiu/apps/wafel_installer/$(TARGET).wuhb
-	@$(MAKE) clean -C $(CURDIR)/source/cfw/ios_kernel
-	@$(MAKE) clean -C $(CURDIR)/source/cfw/ios_fs
-	@$(MAKE) clean -C $(CURDIR)/source/cfw/ios_mcp
-	@$(MAKE) clean -C $(CURDIR)/source/cfw/ios_usb
+	@rm -fr dist/wiiu/apps/isfshax_installer_loader/$(TARGET).rpx dist/wiiu/apps/isfshax_installer_loader/$(TARGET).wuhb
 
 #-------------------------------------------------------------------------------
 dist:
 	@echo Making dist folder
-	@mkdir -p dist/wiiu/apps/wafel_installer
+	@mkdir -p dist/wiiu/apps/isfshax_installer_loader
 	@echo Put latest files into it
-	@cp dist/meta.xml dist/wiiu/apps/wafel_installer/meta.xml
-	@cp dist/wafel_installer-banner.png dist/wiiu/apps/wafel_installer/icon.png
-	@cp $(TARGET).rpx dist/wiiu/apps/wafel_installer/$(TARGET).rpx
-	@cp $(TARGET).wuhb dist/wiiu/apps/wafel_installer/$(TARGET).wuhb
+	@cp dist/meta.xml dist/wiiu/apps/isfshax_installer_loader/meta.xml
+	@cp dist/wafel_installer-banner.png dist/wiiu/apps/isfshax_installer_loader/icon.png
+	@cp $(TARGET).rpx dist/wiiu/apps/isfshax_installer_loader/$(TARGET).rpx
+	@cp $(TARGET).wuhb dist/wiiu/apps/isfshax_installer_loader/$(TARGET).wuhb
 	@echo Zip up a release zip
-	@rm -f dist/wafel_installer.zip
-	@cd dist && zip -q -r ./wafel_installer.zip ./wiiu && cd ..
+	@rm -f dist/isfshax_installer_loader.zip
+	@cd dist && zip -q -r ./isfshax_installer_loader.zip ./wiiu && cd ..
 
 #-------------------------------------------------------------------------------
 
@@ -225,16 +217,17 @@ DEPENDS	:=	$(OFILES:.o=.d)
 all: $(OUTPUT).wuhb $(OUTPUT).wua
 
 $(OUTPUT).wuhb	:	$(OUTPUT).rpx
+	
 $(OUTPUT).wua	:	$(OUTPUT).rpx
 	@echo Creating wua...
-	@cp $(OUTPUT).rpx $(TOPDIR)/dist/wua/00050000103b3b3b_v0/code/wafel_installer.rpx
+	@cp $(OUTPUT).rpx $(TOPDIR)/dist/wua/00050000103b3b3b_v0/code/isfshax_installer_loader.rpx
 	@#rm -rf $(TOPDIR)/dist/wua/00050000103b3b3b_v0/content/
 	@#mkdir $(TOPDIR)/dist/wua/00050000103b3b3b_v0/content/
 	@#cp -r $(TOPDIR)/$(CONTENT)/. $(TOPDIR)/dist/wua/00050000103b3b3b_v0/content/
 	@rm -f $(OUTPUT).wua
 	@# Allow zarchive.exe to fail since on native Linux it will fail
 	@$(TOPDIR)/dist/zarchive.exe $(shell wslpath -m $(TOPDIR)/dist/wua || echo $(TOPDIR)/dist/wua) $(shell wslpath -m $(OUTPUT).wua || echo $(OUTPUT).wua) || echo "zarchive.exe couldn't be executed, skipping wua creation..."
-	@echo built ... wafel_installer.wua
+	@echo built ... isfshax_installer_loader.wua
 $(OUTPUT).rpx	:	$(OUTPUT).elf
 $(OUTPUT).elf	:	$(OFILES)
 

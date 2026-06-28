@@ -1,14 +1,15 @@
 #include "menu.h"
-#include "partition_manager.h"
-#include "startup_checks.h"
+#include "isfshax_menu.h"
 #include "navigation.h"
-#include "cfw.h"
 #include "filesystem.h"
-#include "exploit.h"
 #include "gui.h"
-#include <unistd.h> // For access function
+#include <unistd.h>
 #include <chrono>
 #include <thread>
+#include <whb/sdcard.h>
+#include <mocha/mocha.h>
+
+using namespace std::chrono_literals;
 
 // Initialize correct heaps for CustomRPXLoader
 extern "C" void __init_wut_malloc();
@@ -26,54 +27,33 @@ int main() {
     ACPInitialize();
     initializeInputs();
 
-
-
-    IMDisableAPD(); // Disable auto-shutdown feature
-
-    // Start Wafel Installer
+    // Start ISFShax Installer Launcher
     showLoadingScreen();
-    if (testCFW() != FAILED && ((getCFWVersion() == MOCHA_FSCLIENT || getCFWVersion() == CEMU || getCFWVersion() == CUSTOM_MOCHA) || installCFW()) && initCFW() ) {
-        setupMountGuard(getCFWVersion());
-        mountSystemDrives();
-        WHBLogFreetypePrint(L" ");
-        WHBLogPrint("Finished loading!");
-        WHBLogFreetypeDraw();
-        sleep_for(2s);
-        if (performStartupChecks()) {
-            showMainMenu();
-        }
-    }
+    
+    // We rely on Mocha functionality being available via Aroma
+    Mocha_InitLibrary();
+    WHBMountSdCard();
 
-    bool reboot = getCFWVersion() != MOCHA_FSCLIENT  || isRebootPending();
+    WHBLogFreetypePrint(L" ");
+    WHBLogPrint("Finished loading!");
+    WHBLogFreetypeDraw();
+    sleep_for(2s);
+    
+    showMainMenu();
 
-    if (isShutdownPending()) {
-        WHBLogFreetypeStartScreen();
-        WHBLogPrint("Shutting down now...");
-        WHBLogFreetypeDraw();
-        sleep_for(3s);
-        OSShutdown();
-    } else if (isRebootPending()) {
-        WHBLogFreetypeStartScreen();
-        WHBLogPrint("Rebooting now...");
-        WHBLogPrint("To apply the changes.");
-        WHBLogFreetypeDraw();
-        sleep_for(3s);
-    }
-    else {
-        WHBLogPrint("");
-        WHBLogPrint(!reboot ? "Exiting Wafel Installer..." : "Exiting Wafel Installer and rebooting Wii U...");
-        WHBLogFreetypeDraw();
-        sleep_for(5s);
-    }
+    WHBLogPrint("");
+    WHBLogPrint("Exiting ISFShax Installer Launcher...");
+    WHBLogFreetypeDraw();
+    sleep_for(2s);
 
     // Close application properly
-    unmountSystemDrives();
-    shutdownCFW();
+    WHBUnmountSdCard();
+    Mocha_DeInitLibrary();
     ACPFinalize();
     nn::act::Finalize();
     FSShutdown();
     shutdownInputs();
     shutdownGUI();
 
-    exitApplication(reboot, isFullRebootPending());
+    return 0;
 }

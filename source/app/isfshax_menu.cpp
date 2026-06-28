@@ -1,13 +1,11 @@
 #include "isfshax_menu.h"
 #include "menu.h"
 #include "gui.h"
-#include "cfw.h"
 #include "fw_img_loader.h"
-#include "download.h"
 #include "filesystem.h"
 #include "common_paths.h"
-#include "urls.h"
 #include "common.h"
+#include "navigation.h"
 #include <mbedtls/sha1.h>
 #include <isfshax_cmd.h>
 #include <vector>
@@ -16,6 +14,8 @@
 #include <cctype>
 
 using namespace std::chrono_literals;
+
+#define OPTION(n) (selectedOption == (n) ? L'>' : L' ')
 
 bool confirmIsfshaxAction(const wchar_t* action, bool isUninstall = false) {
     std::wstring message = L"";
@@ -27,9 +27,9 @@ bool confirmIsfshaxAction(const wchar_t* action, bool isUninstall = false) {
     }
 
     message += L"WARNING: You are about to make modifications to the console.\n"
-                           L"This software comes with ABSOLUTELY NO WARRANTY!\n"
-                           L"You are choosing to use this at your own risk.\n"
-                           L"The author(s) will not be held liable for any damage.\n \n";
+               L"This software comes with ABSOLUTELY NO WARRANTY!\n"
+               L"You are choosing to use this at your own risk.\n"
+               L"The author(s) will not be held liable for any damage.\n \n";
 
     message += L"Do you want to proceed with ";
     message += action;
@@ -63,22 +63,22 @@ std::vector<unsigned char> calculateSHA1(const std::string& path) {
 }
 
 bool verifySuperblock() {
-    std::wstring sblockFilename = toWstring(std::filesystem::path(Paths::SlcInstallerSblockImg).filename().string());
-    std::wstring shaFilename = toWstring(std::filesystem::path(Paths::SlcInstallerSblockSha).filename().string());
+    std::wstring sblockFilename = toWstring(std::filesystem::path(Paths::SdSuperblockImg).filename().string());
+    std::wstring shaFilename = toWstring(std::filesystem::path(Paths::SdSuperblockSha).filename().string());
 
-    if (!fileExist(Paths::SlcInstallerSblockImg)) {
-        setErrorPrompt((L"Superblock image (" + sblockFilename + L") is missing!").c_str());
+    if (!fileExist(Paths::SdSuperblockImg)) {
+        setErrorPrompt((L"Superblock image (" + sblockFilename + L") is missing from SD!").c_str());
         showErrorPrompt(L"OK");
         return false;
     }
-    if (!fileExist(Paths::SlcInstallerSblockSha)) {
-        setErrorPrompt((L"Superblock SHA file (" + shaFilename + L") is missing!").c_str());
+    if (!fileExist(Paths::SdSuperblockSha)) {
+        setErrorPrompt((L"Superblock SHA file (" + shaFilename + L") is missing from SD!").c_str());
         showErrorPrompt(L"OK");
         return false;
     }
 
     std::vector<unsigned char> expectedSha;
-    FILE* shaFile = fileFopen(Paths::SlcInstallerSblockSha, "rb");
+    FILE* shaFile = fileFopen(Paths::SdSuperblockSha.c_str(), "rb");
     if (shaFile) {
         unsigned char hashBuf[20];
         if (fread(hashBuf, 1, 20, shaFile) == 20) {
@@ -93,7 +93,7 @@ bool verifySuperblock() {
         return false;
     }
 
-    std::vector<unsigned char> actualSha = calculateSHA1(Paths::SlcInstallerSblockImg);
+    std::vector<unsigned char> actualSha = calculateSHA1(Paths::SdSuperblockImg);
     if (actualSha.empty()) {
         setErrorPrompt((L"Failed to calculate SHA-1 of " + sblockFilename + L"!").c_str());
         showErrorPrompt(L"OK");
@@ -117,108 +117,101 @@ bool verifySuperblock() {
 }
 
 void installIsfshax(bool uninstall, bool manual) {
-    // For automated install, proactively download latest files
-    if (!uninstall && !manual) {
-        if (!downloadIsfshaxFiles()) return;
-    }
-
-    bool installer_exists = fileExist(Paths::SlcInstallerFwImg);
-
-    // For we need the installer file, uninstall will download later
-    if (!uninstall && !installer_exists) {
-        uint8_t missingChoice = showDialogPrompt(L"The ISFShax installer (fw.img) is missing.", L"Download", L"Cancel");
-        if (missingChoice == 0) {
-            if (!downloadIsfshaxFiles()) return;
-        } else {
-            return;
-        }
+    if (!fileExist(Paths::SdInstallerImg)) {
+        setErrorPrompt(L"The ISFShax installer (ios.img) is missing from the SD card root!");
+        showErrorPrompt(L"OK");
+        return;
     }
 
     if (manual) {
-        bootInstaller();
+        while (true) {
+            sleep_for(1s);
+            uint8_t choice = showDialogPrompt(L"The ISFShax installer is controlled with the buttons on the main console.\nPOWER: moves the curser\nEJECT: confirm\nPress A to launch into the ISFShax Installer", L"Continue", L"Cancel");
+            if (choice == 0) {
+                if (verifySuperblock()) {
+                    loadFwImg(Paths::SdInstallerImg, 0, 0);
+                    break;
+                }
+            } else {
+                return;
+            }
+        }
         return;
     }
 
     if(uninstall){
         if (confirmIsfshaxAction(L"Uninstall", true)) {
-            if(installer_exists){
-                if (moveFile(Paths::SlcInstallerFwImg, Paths::SystemTmpFwImg)) {
-                    deleteDirContent(Paths::SlcInstallerDir);
-                    removeDir(Paths::SlcInstallerDir);
-                    if (isDirEmpty(Paths::SlcHaxDir)) {
-                        removeDir(Paths::SlcHaxDir);
-                    }
-                } else {
-                    setErrorPrompt(L"Failed to move installer to /sys/tmp!");
-                    showErrorPrompt(L"OK");
-                    return;
-                }
-            } else {
-                if(!downloadFile(URLs::IsfshaxInstallerIosImg, Paths::SystemTmpFwImg)){
-                    setErrorPrompt(L"Failed to download ISFShax installer to /sys/tmp!");
-                    showErrorPrompt(L"OK");
-                    return;
-                }
-            }
-            loadFwImg(Paths::SystemTmpFwImg, ISFSHAX_CMD_UNINSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SLC);
+            loadFwImg(Paths::SdInstallerImg, ISFSHAX_CMD_UNINSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
         }
         return;
     }
-
 
     if (confirmIsfshaxAction(L"Install")) {
         if (verifySuperblock()) {
-            loadFwImg(Paths::SystemHaxInstallerFwImg, ISFSHAX_CMD_INSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SLC);
+            loadFwImg(Paths::SdInstallerImg, ISFSHAX_CMD_INSTALL, (uint32_t)(ISFSHAX_CMD_POST_REBOOT) << 30 | ISFSHAX_CMD_SOURCE_SD);
         }
     }
 }
 
-void installIsfshaxMenu() {
-    if (!checkSystemAccess()) return;
+void showMainMenu() {
+    uint8_t selectedOption = 0;
+    while(true) {
+        bool startSelectedOption = false;
+        while(!startSelectedOption) {
+            // Print menu text
+            WHBLogFreetypeStartScreen();
+            WHBLogFreetypePrint(L"ISFShax Installer Launcher");
+            WHBLogFreetypePrint(L"===============================");
+            WHBLogFreetypePrintf(L"%C Install ISFShax", OPTION(0));
+            WHBLogFreetypePrintf(L"%C Uninstall ISFShax", OPTION(1));
+            WHBLogFreetypePrintf(L"%C Boot ISFShax Installer (Manual)", OPTION(2));
+            WHBLogFreetypePrint(L" ");
+            WHBLogFreetypeScreenPrintBottom(L"===============================");
+            WHBLogFreetypeScreenPrintBottom(L"\uE000 Button = Select Option \uE001 Button = Exit");
+            WHBLogFreetypeScreenPrintBottom(L"");
+            WHBLogFreetypeDrawScreen();
 
-    std::vector<std::wstring> options = {
-        L"Install (Automated)",
-        L"Uninstall (Automated)",
-        L"Expert (Manual)",
-        L"Download latest files",
-        L"Cancel"
-    };
-
-    uint8_t choice = showDialogPrompt(L"Select an option for the ISFShax installer:", options);
-    if (choice == 4 || choice == 255) return;
-
-    if (choice == 3) {
-        if (downloadIsfshaxFiles()) {
-            showSuccessPrompt(L"ISFShax files downloaded successfully!");
+            // Loop until there's new input
+            updateInputs();
+            while(!startSelectedOption) {
+                updateInputs();
+                // Check each button state
+                if (navigatedUp()) {
+                    if (selectedOption > 0) {
+                        selectedOption--;
+                        break;
+                    }
+                }
+                if (navigatedDown()) {
+                    if (selectedOption < 2) {
+                        selectedOption++;
+                        break;
+                    }
+                }
+                if (pressedOk()) {
+                    startSelectedOption = true;
+                    break;
+                }
+                if (pressedBack()) {
+                    WHBLogFreetypeClear();
+                    return;
+                }
+            }
         }
-        return;
-    }
 
-    installIsfshax(choice==1, choice==2);
-}
-
-void bootInstaller() {
-    if (!checkSystemAccess()) return;
-
-    std::string fwImgPath = Paths::SlcInstallerFwImg;
-    if (!fileExist(fwImgPath)) {
-        setErrorPrompt(L"ISFShax installer (fw.img) is missing!");
-        showErrorPrompt(L"OK");
-        return;
-    }
-
-    while (true) {
-        sleep_for(1s);
-        uint8_t choice = showDialogPrompt(L"The ISFShax installer is controlled with the buttons on the main console.\nPOWER: moves the curser\nEJECT: confirm\nPress A to launch into the ISFShax Installer", L"Continue", L"Cancel");
-        if (choice == 0) {
-            if (verifySuperblock()) {
-                loadFwImg(Paths::SystemHaxInstallerFwImg);
+        // Go to the selected menu
+        switch(selectedOption) {
+            case 0:
+                installIsfshax(false, false);
                 break;
-            }
-        } else {
-            if (showDialogPrompt(L"Are you sure? ISFShax is required for stroopwafel", L"Yes, cancel", L"No, go back") == 0) {
-                return;
-            }
+            case 1:
+                installIsfshax(true, false);
+                break;
+            case 2:
+                installIsfshax(false, true);
+                break;
+            default:
+                break;
         }
     }
 }

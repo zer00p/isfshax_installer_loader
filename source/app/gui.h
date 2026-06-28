@@ -6,3 +6,4 @@
 bool initializeGUI();
 void shutdownGUI();
 void exitApplication(bool reboot, bool fullReboot);
+bool stillRunning();

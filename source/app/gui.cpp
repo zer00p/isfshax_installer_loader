@@ -1,7 +1,5 @@
 #include "gui.h"
 #include "navigation.h"
-#include "cfw.h"
-
 static bool usingHBL = false;
 
 #define HBL_TITLE_ID (0x0005000013374842)
