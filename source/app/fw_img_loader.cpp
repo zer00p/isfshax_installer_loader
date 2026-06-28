@@ -68,7 +68,16 @@ static bool applyPatch(uint32_t addr, const void* data, size_t size, const wchar
     return true;
 }
 
-
+/**
+ * Loads and launches a firmware image file (e.g. the ISFShax installer).
+ * 
+ * @param fwPath    The absolute path to the firmware image file (e.g., "/vol/sdcard/ios.img").
+ *                  When using manual patching (stroopwafel unavailable), the directory path 
+ *                  length and the filename length have constraints based on the original 
+ *                  IOSU string buffer sizes (e.g., directory path should typically fit in 64 bytes).
+ * @param command   An optional ISFShax command to execute. Set to 0 if no command is needed.
+ * @param parameter The parameter associated with the ISFShax command.
+ */
 void loadFwImg(const std::string& fwPath, uint32_t command, uint32_t parameter) {
     WHBLogFreetypeStartScreen();
 
@@ -96,16 +105,16 @@ void loadFwImg(const std::string& fwPath, uint32_t command, uint32_t parameter) 
         WHBLogFreetypePrint(L"Path changed using libstroopwafel. Skipping patches.");
     } else {
         WHBLogFreetypePrint(L"libstroopwafel not available. Applying manual patches...");
-        // The IOSU hook mounts /dev/sdcard01 as /vol/sdcard
-        // So the installer file path directory needs to be /vol/sdcard
-        char fwDir[64];
-        std::memset(fwDir, 0, sizeof(fwDir));
-        std::strncpy(fwDir, "/vol/sdcard", sizeof(fwDir) - 1);
-        if (!applyPatch(0x050663B4, fwDir, sizeof(fwDir), L"Applying fw_path...")) return;
+        size_t lastSlashPos = fwPath.find_last_of('/');
+        std::string dirPath = (lastSlashPos != std::string::npos) ? fwPath.substr(0, lastSlashPos) : "";
+        std::string fileName = (lastSlashPos != std::string::npos) ? fwPath.substr(lastSlashPos + 1) : fwPath;
 
-        // Update "fw.img" to "ios.img". Overwrites the start of "htk.bin" but that's fine.
-        char iosImgStr[] = "ios.img";
-        if (!applyPatch(0x0506231C, iosImgStr, sizeof(iosImgStr), L"Applying ios.img rename...")) return;
+        // The IOSU hook mounts /dev/sdcard01 as /vol/sdcard
+        // Overwrites the default "/vol/sdcard" string.
+        if (!applyPatch(0x050663B4, dirPath.c_str(), dirPath.length() + 1, L"Applying fw_path...")) return;
+
+        // Update "fw.img" to the new filename. Overwrites the start of "htk.bin" if longer than 7 bytes, but that's fine.
+        if (!applyPatch(0x0506231C, fileName.c_str(), fileName.length() + 1, L"Applying image rename...")) return;
 
         uint64_t p2 = 0x00a4F031FB43193b; // need to align patch for old mocha
         if (!applyPatch(0x050282AC, &p2, 8, L"Applying patch 2 (launch_os_hook bl)...")) return;
@@ -149,7 +158,7 @@ void loadFwImg(const std::string& fwPath, uint32_t command, uint32_t parameter) 
     }
 
     WHBLogFreetypeClear();
-    WHBLogFreetypePrintf(L"Patches applied. Launching ISFShax Installer (%S)...", toWstring(fwPath).c_str());
+    WHBLogFreetypePrintf(L"Launching ISFShax Installer (%S)...", toWstring(fwPath).c_str());
     WHBLogFreetypeDraw();
     sleep_for(3s);
 
