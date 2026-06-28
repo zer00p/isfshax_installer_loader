@@ -55,5 +55,5 @@ int main() {
     shutdownInputs();
     shutdownGUI();
 
-    return 0;
+    exitApplication(false, false);
 }

@@ -7,6 +7,7 @@
 #include <isfshax_cmd.h>
 #include <whb/sdcard.h>
 #include <nn/act.h>
+#include <stroopwafel/stroopwafel.h>
 #include <coreinit/thread.h>
 
 #include <cstring>
@@ -87,70 +88,76 @@ void loadFwImg(const std::string& fwPath, uint32_t command, uint32_t parameter) 
     WHBLogFreetypePrint(L"Applying patches...");
     WHBLogFreetypeDrawScreen();
 
-    // The IOSU hook mounts /dev/sdcard01 as /vol/sdcard
-    // So the installer file path directory needs to be /vol/sdcard
-    char fwDir[64];
-    std::memset(fwDir, 0, sizeof(fwDir));
-    std::strncpy(fwDir, "/vol/sdcard", sizeof(fwDir) - 1);
-    if (!applyPatch(0x050663B4, fwDir, sizeof(fwDir), L"Applying fw_path...")) return;
+    bool stroopwafel_available = (Stroopwafel_InitLibrary() == STROOPWAFEL_RESULT_SUCCESS);
 
-    // Update "fw.img" to "ios.img". Overwrites the start of "htk.bin" but that's fine.
-    char iosImgStr[] = "ios.img";
-    if (!applyPatch(0x0506231C, iosImgStr, sizeof(iosImgStr), L"Applying ios.img rename...")) return;
+    if (stroopwafel_available) {
+        WHBLogFreetypePrint(L"libstroopwafel is available. Using stroopwafel to change firmware path.");
+        Stroopwafel_SetFwPath(fwPath.c_str());
+        WHBLogFreetypePrint(L"Path changed using libstroopwafel. Skipping patches.");
+    } else {
+        WHBLogFreetypePrint(L"libstroopwafel not available. Applying manual patches...");
+        // The IOSU hook mounts /dev/sdcard01 as /vol/sdcard
+        // So the installer file path directory needs to be /vol/sdcard
+        char fwDir[64];
+        std::memset(fwDir, 0, sizeof(fwDir));
+        std::strncpy(fwDir, "/vol/sdcard", sizeof(fwDir) - 1);
+        if (!applyPatch(0x050663B4, fwDir, sizeof(fwDir), L"Applying fw_path...")) return;
 
-    uint64_t p2 = 0x00a4F031FB43193b; // need to align patch for old mocha
-    if (!applyPatch(0x050282AC, &p2, 8, L"Applying patch 2 (launch_os_hook bl)...")) return;
+        // Update "fw.img" to "ios.img". Overwrites the start of "htk.bin" but that's fine.
+        char iosImgStr[] = "ios.img";
+        if (!applyPatch(0x0506231C, iosImgStr, sizeof(iosImgStr), L"Applying ios.img rename...")) return;
 
-    uint32_t p3 = 0xE3A00000;
-    if (!applyPatch(0x05052C44, &p3, 4, L"Applying patch 3 (mov r0, #0)...")) return;
+        uint64_t p2 = 0x00a4F031FB43193b; // need to align patch for old mocha
+        if (!applyPatch(0x050282AC, &p2, 8, L"Applying patch 2 (launch_os_hook bl)...")) return;
 
-    uint32_t p4 = 0xE12FFF1E;
-    if (!applyPatch(0x05052C48, &p4, 4, L"Applying patch 4 (bx lr)...")) return;
+        uint32_t p3 = 0xE3A00000;
+        if (!applyPatch(0x05052C44, &p3, 4, L"Applying patch 3 (mov r0, #0)...")) return;
 
-    uint32_t p5 = 0x20002000;
-    if (!applyPatch(0x0500A818, &p5, 4, L"Applying patch 5 (mov r0, #0; mov r0, #0)...")) return;
+        uint32_t p4 = 0xE12FFF1E;
+        if (!applyPatch(0x05052C48, &p4, 4, L"Applying patch 4 (bx lr)...")) return;
 
-    if (!applyPatch(0x05059938, os_launch_hook, sizeof(os_launch_hook), L"Applying os_launch_hook...")) return;
+        uint32_t p5 = 0x20002000;
+        if (!applyPatch(0x0500A818, &p5, 4, L"Applying patch 5 (mov r0, #0; mov r0, #0)...")) return;
 
-    uint32_t ancast_hook_start = (0x05059938 + sizeof(os_launch_hook) + 3) & ~3;
-    if (!applyPatch(ancast_hook_start, ancast_decrypt_hook, sizeof(ancast_decrypt_hook), L"Applying ancast_decrypt_hook...")) return;
+        if (!applyPatch(0x05059938, os_launch_hook, sizeof(os_launch_hook), L"Applying os_launch_hook...")) return;
 
-    uint32_t p8 = generate_bl_t(0x0500A678, ancast_hook_start);
-    if (!applyPatch(0x0500A678, &p8, 4, L"Applying patch 8 (generate_bl_t)...")) return;
+        uint32_t ancast_hook_start = (0x05059938 + sizeof(os_launch_hook) + 3) & ~3;
+        if (!applyPatch(ancast_hook_start, ancast_decrypt_hook, sizeof(ancast_decrypt_hook), L"Applying ancast_decrypt_hook...")) return;
 
-    uint32_t p9 = 0xe00fbf00;
-    if (!applyPatch(0x0500A7C8, &p9, 4, L"Applying patch 9 (Ancast header nop nop)...")) return;
+        uint32_t p8 = generate_bl_t(0x0500A678, ancast_hook_start);
+        if (!applyPatch(0x0500A678, &p8, 4, L"Applying patch 8 (generate_bl_t)...")) return;
 
-    uint32_t p10 = 0x2302e003;
-    if (!applyPatch(0x0500a7f4, &p10, 4, L"Applying patch 10 (movs r3, #2; b #0x500a800)...")) return;
+        uint32_t p9 = 0xe00fbf00;
+        if (!applyPatch(0x0500A7C8, &p9, 4, L"Applying patch 9 (Ancast header nop nop)...")) return;
 
-    // Undo ISFShax fallback reload patch
-    uint32_t val = 0; 
-    MochaUtilsStatus status = Mocha_IOSUKernelRead32(0x0501f578, &val);
-    if (status != MOCHA_RESULT_SUCCESS) {
-        WHBLogFreetypePrint(L"Warning: Failed to read ISFShax fallback patch!");
-        WHBLogFreetypeDrawScreen();
-    } else if (val == 0x32044bcc) {
-        uint32_t undo_val = 0xe0914bcc;
-        if (!applyPatch(0x0501f578, &undo_val, 4, L"Undoing ISFShax fallback reload patch...")) return;
+        uint32_t p10 = 0x2302e003;
+        if (!applyPatch(0x0500a7f4, &p10, 4, L"Applying patch 10 (movs r3, #2; b #0x500a800)...")) return;
+
+        // Undo ISFShax fallback reload patch
+        uint32_t val = 0; 
+        MochaUtilsStatus status = Mocha_IOSUKernelRead32(0x0501f578, &val);
+        if (status != MOCHA_RESULT_SUCCESS) {
+            WHBLogFreetypePrint(L"Warning: Failed to read ISFShax fallback patch!");
+            WHBLogFreetypeDrawScreen();
+        } else if (val == 0x32044bcc) {
+            uint32_t undo_val = 0xe0914bcc;
+            if (!applyPatch(0x0501f578, &undo_val, 4, L"Undoing ISFShax fallback reload patch...")) return;
+        }
+
+        uint32_t bl_LaunchBootrom = 0xebffffca;
+        applyPatch(0x0812a120, &bl_LaunchBootrom, 4, L"Undoing PayloadLoader reboot Patch...");
     }
-
-    uint32_t bl_LaunchBootrom = 0xebffffca;
-    applyPatch(0x0812a120, &bl_LaunchBootrom, 4, L"Undoing PayloadLoader reboot Patch...");
 
     WHBLogFreetypeClear();
     WHBLogFreetypePrintf(L"Patches applied. Launching ISFShax Installer (%S)...", toWstring(fwPath).c_str());
     WHBLogFreetypeDraw();
     sleep_for(3s);
 
-    WHBUnmountSdCard();
     Mocha_DeInitLibrary();
-    ACPFinalize();
-    nn::act::Finalize();
-    FSShutdown();
-    shutdownInputs();
-    shutdownGUI();
+    if (stroopwafel_available) {
+        Stroopwafel_DeInitLibrary();
+    }
 
-    SYSLaunchMenu();
+    exitApplication(true, false);
     _Exit(0);
 }
